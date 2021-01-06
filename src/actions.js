@@ -91,7 +91,8 @@ var actionList = {
             Delay: "-=0.5",
             Motion: 'to',
             TargetType:'Object',
-            Repeat: true
+            Repeat: true,
+            Scene: 'Action'
         }]
     },
     '3' : {

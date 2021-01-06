@@ -1,13 +1,11 @@
 <template>
-    <b-container id='background' fluid> 
-         <b-row id='container'>
-            <b-col id='scene' cols="8">
-            </b-col>
-            <b-col id='assets' cols="4">
-            </b-col>
-         </b-row>
-         
-    </b-container>
+<div>
+        <div id="container"> </div>
+            <span id='scene' class="diagram left">
+            </span>
+            <span id='assets'>
+            </span>
+        </div>
 </template>
 
 <script>
@@ -28,43 +26,116 @@ export default {
             mouse: new Three.Vector2(),
             timeline: new TimelineLite(),
             objects: objects,
-            createdObjects: {}
+            createdObjects: {},
+            sceneMain: null,
+            sceneAction: null,
+            time: 0
         }
     },
     methods: {
-        setUp: function() {
-            this.container = document.getElementById('container');
-            this.camera = new Three.PerspectiveCamera(25,this.container.clientWidth/this.container.clientHeight,0.1,1000);
-            this.camera.position.z = 50;
-            this.camera.position.y = 6;
-            this.camera.position.x = -5;
-            this.scene = new Three.Scene();
-            this.camera.lookAt(this.scene.position);
-            this.renderer = new Three.WebGLRenderer({antialias: true,alpha:true});
-            this.renderer.setSize(this.container.clientWidth, this.container.clientHeight, false);
-
-            //lighting
-            const ambientLight = new Three.AmbientLight( 0xffffff ,.5);
-            const shadowLight = new Three.DirectionalLight(0xffffff, .1);
-            shadowLight.position.set(50, 10, -80);
-            shadowLight.castShadow = true;
-            //shadowLight.shadow.camera.right = 15; //default:5
-            //shadowLight.shadow.camera.top = 10;
-            const backLight = new Three.DirectionalLight(0xffffff, .9);
-            backLight.position.set(14, 200, 200);
-            backLight.target.position.set(-100, 400, 200);
-            backLight.castShadow = true;
-            this.scene.add(backLight);
-            this.scene.add(ambientLight);
-            this.scene.add(shadowLight);
-            //this.dragControls = new TransformControls(this.camera,this.renderer.domElement);
-            //initial objects
-            this.update(this.state,1)
+        makeScene: function(elem) {
+            let scene = new Three.Scene();
+            //let container = elem.getBoundingClientRect();
+                    let camera = new Three.PerspectiveCamera(45,2,0.1,200);
+                    camera.position.z = 2;
+        camera.position.set(0, 1, 2);
+        camera.lookAt(0, 0, 0);
+                    //camera.lookAt(scene.position);
+                    {
+            const color = 0xFFFFFF;
+            const intensity = 1;
+            const light = new Three.DirectionalLight(color, intensity);
+            light.position.set(-1, 2, 4);
+            scene.add(light);
+        }
+        
+        return {scene, camera, elem};
+        },
+        setupMain: function() {
+            console.log('setupMain')
+            const sceneInfo = this.makeScene(document.querySelector('#scene'));
+            const geometry = new Three.BoxBufferGeometry(1, 1, 1);
+            const material = new Three.MeshPhongMaterial({color: 'red'});
+            const mesh = new Three.Mesh(geometry, material);
+            sceneInfo.scene.add(mesh);
+            console.log('POSITION',mesh.position);
+            sceneInfo.Name = 'Main'
+            return sceneInfo;
+        },
+        setupAction: function() {
+            console.log('setupAction')
+            const sceneInfo = this.makeScene(document.querySelector('#assets'));
+            return sceneInfo;
+        },
+        renderSceneInfo: function(sceneInfo) {
+            const {scene, camera, elem} = sceneInfo;
+            //console.log('EEEEEL',elem)
+            const {left, right, top, bottom, width, height} = elem.getBoundingClientRect();
+            const isOffScreen = 
+                bottom < 0 || 
+                top > this.renderer.domElement.clientHeight || 
+                right < 0 || 
+                left > this.renderer.domElement.clientWidth;
+            if(isOffScreen) {
+                return false;
+            }
             //
+            //camera.aspect = width/height;
+            //console.log('elem',elem,right,top,left,bottom);
+            const positiveYUpBottom = this.renderer.domElement.clientHeight - bottom;
+            this.renderer.setScissor(left, positiveYUpBottom, width, height);
+            this.renderer.setViewport(left, positiveYUpBottom, width, height);
+            this.renderer.render(scene, camera); 
+            //this.renderer.render(this.sceneMain.scene, this.sceneMain.camera);
+        },
+        updateObjs: function() {
+            var time = Date.now() / 1000;
+            //raycaster to detect spray press
+            this.raycaster.setFromCamera(this.mouse,this.sceneMain.camera);
+            //console.log('MOUSE',this.sceneMain.scene.children)
+            var intersectedObjects = this.raycaster.intersectObjects(this.sceneAction.scene.children,true);
+            if(intersectedObjects) {
+                console.log('YAYYYY',intersectedObjects)
+            }
+            for(let i = 0; i < 5; i++) {
+                /*if(intersectedObjects[i].object.name) {
+                    this.updateState(intersectedObjects[i].object.name);
+                }*/
+            }
+            this.update(this.state,time);
+        },
+        renderScene: function() {
+            this.resizeRendererToDisplaySize();
+            
+            this.renderer.setScissorTest(false);
+            this.renderer.clear(true, true);
+            this.renderer.setScissorTest(true);
+            
+            this.updateObjs();
+            this.renderSceneInfo(this.sceneMain);
+            this.renderSceneInfo(this.sceneAction);
+            //requestAnimationFrame(this.renderScene);
+        },
+        resizeRendererToDisplaySize: function() {
+            const canvas = this.renderer.domElement;
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            const needResize = canvas.width !== width || canvas.height !== height;
+            if (needResize) {
+            this.renderer.setSize(width, height, false);
+            }
+            return needResize;
+        },
+        setUp: function() {
+            this.container = document.querySelector('#container');
+            this.renderer = new Three.WebGLRenderer({antialias: true,alpha:true});
+            this.sceneMain = this.setupMain();
+            this.sceneAction = this.setupAction();
+            this.renderer.setSize(this.container.clientWidth, this.clientHeight, false);
             this.raycaster = new Three.Raycaster();
             document.addEventListener('mousedown',this.onMouseDown,false);
             this.renderer.setAnimationLoop(() => {
-                this.render();
+                this.renderScene(this.sceneMain);
             })
             this.container.appendChild(this.renderer.domElement);
         },
@@ -76,16 +147,20 @@ export default {
                     if(!currentAction.Repeat) {
                         currentAction.Done = true;
                     }
+                    console.log('this.sceneMain2222',this.sceneMain,this.sceneAction)
+                        let sceneInfo = this.sceneMain.scene;
+                        if(currentAction.Scene == 'Action') {
+                            sceneInfo = this.sceneAction.scene;
+                        }
                     switch(currentAction.Type) {
                         case 'create' :
                             if(!this.createdObjects[currentAction.Target]) this.createdObjects[currentAction.Target] = {};
-                            
                             this.create(this.objects[currentAction.Target].create(this.createdObjects[currentAction.Target]),
                                         currentAction.Target,
-                                        currentAction.TargetType);
+                                        currentAction.TargetType,sceneInfo);
                         break;
                         case 'remove':
-                            this.remove(this.objects[currentAction.Target].remove(this.createdObjects[currentAction.Target]));
+                            this.remove(this.objects[currentAction.Target].remove(this.createdObjects[currentAction.Target]),sceneInfo);
                         break;
                         case 'threeanimate':
                             this.objects[currentAction.Target].update(this.createdObjects[currentAction.Target],time);
@@ -130,23 +205,23 @@ export default {
             }
         },
         render: function() {
-            var time = Date.now() / 1000;
+            /*var time = Date.now() / 1000;
             //raycaster to detect spray press
             this.raycaster.setFromCamera(this.mouse,this.camera);
-            var intersectedObjects = this.raycaster.intersectObjects(this.scene.children,true);
+            var intersectedObjects = this.raycaster.intersectObjects(this.sceneMain.scene.children,true);
             for(let i = 0; i < intersectedObjects.length; i++) {
                 if(intersectedObjects[i].object.name) {
                     this.updateState(intersectedObjects[i].object.name);
                 }
             }
-            this.update(this.state,time);
-            this.renderer.render(this.scene, this.camera);
+            this.update(this.state,time);*/
+            this.renderer.render(this.sceneMain.scene, this.sceneMain.camera);
         },
         
         // utility 
-        create: function(object,refName,refType) {
+        create: function(object,refName,refType,sceneInfo) {
             if(object) {
-                this.scene.add(object);
+                sceneInfo.add(object);
                 if(refType == 'Array') {
                     this.createdObjects[refName].Item.push(object);
                 } else {
@@ -154,9 +229,9 @@ export default {
                 }
             }
         },
-        remove: function(removeids) {
+        remove: function(removeids,sceneInfo) {
             for(let i=0; i<removeids.length; i++) {
-                this.scene.remove(this.scene.getObjectById(removeids[i]));
+                sceneInfo.remove(this.scene.getObjectById(removeids[i]));
             }
         },
         gsapanimate: function(type,prop,objectName,updateparams,delay,motion,isSceneObj) {
@@ -185,8 +260,10 @@ export default {
             this.timeline.to(target,updateparams,delay);
         },
         onMouseDown: function(event) {
-                this.mouse.x = (event.clientX/this.container.clientWidth) * 2 -1;
-                this.mouse.y = -(event.clientY/this.container.clientHeight) * 2 + 1
+                //let curr = document.querySelector('#scene')
+                this.mouse.x = ( ( event.clientX - this.renderer.domElement.offsetLeft ) / this.renderer.domElement.clientWidth ) * 2 - 1;
+                this.mouse.y = - ( ( event.clientY - this.renderer.domElement.offsetTop ) / this.renderer.domElement.clientHeight ) * 2 + 1;
+                console.log('HELLOOO',this.mouse.x,this.mouse.y);
             },
     },
     mounted() {
@@ -198,16 +275,42 @@ export default {
 }
 </script>
 <style scoped>
-#background {
-    height: 800px;
+#c {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: -1;
 }
 
 #container  {
-    height: 800px;
+    position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: -1;
 }
-
-#scene {
-    background-color: #9db5e0;
+.diagram {
+  display: inline-block;
+  width: 10em;
+  height: 7em;
+  border: 1px solid black;
+}
+.left {
+  float: left;
+  margin-right: .25em;
+}
+#scene1 {
+background-color: #9db5e0;
+display: inline-block;
+  border: 1px solid black;
+  height: 400px;
+  width: 400px;
+  float: left;
 }
 
 #assets {

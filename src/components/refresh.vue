@@ -1,22 +1,6 @@
 <template>
-    <div class="h-100">
-        <b-overlay :show="show">
-            <sceneManager/>
-            <template v-slot:overlay>
-                <div class="text-center">
-                    <p>Little things matter</p>
-                    <b-button
-                        ref="cancel"
-                        variant="primary"
-                        size="sm"
-                        aria-describedby="cancel-label"
-                        @click="show = false"
-                    >
-                        Lets' go to her.
-                    </b-button>
-                </div>
-            </template>
-        </b-overlay>
+    <div>
+        <sceneManager/>
     </div>
 </template>
 <script>
